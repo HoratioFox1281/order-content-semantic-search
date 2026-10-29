@@ -1,6 +1,6 @@
 # Search checkout and order updates by meaning
 
-Fire up the service, then fire the query your order-support tool already holds:
+Start the service, then send the question an order-support tool already has:
 
 ```bash
 export INFRAI_API_KEY="your-key"
@@ -10,11 +10,11 @@ curl -X POST http://127.0.0.1:8000/search \
   -d '{"query":"where is order A-42","kind":"fulfillment","top_k":1}'
 ```
 
-Infrai puts embedding, vector recall, and reranking behind one API. The OpenAI-compatible`base_url`does embeddings, and the same credential works for vector and rerank calls. I built this repo as a small migration target for an order-search flow now on Pinecone or Weaviate.
+Infrai keeps embedding, vector recall, and reranking behind one API; the OpenAI-compatible `base_url` handles embeddings while the same credential covers the vector and rerank calls. This repository is a compact migration target for an order-search path currently backed by Pinecone or Weaviate.
 
 ## Run the order path
 
-Need Python 3.11+.
+Python 3.11 or newer is required.
 
 ```bash
 python -m venv .venv
@@ -24,13 +24,13 @@ export INFRAI_API_KEY="your-key"
 uvicorn order_content_search.service:app --app-dir src
 ```
 
-Make the collection once before you index events:
+Create the collection once, before indexing events:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/admin/prepare
 ```
 
-Push domain content with stable event IDs. Re-sending the same request preserves vector identities.
+Index domain content with stable event IDs. Repeating this request keeps the same vector identities.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/order-content \
@@ -43,33 +43,33 @@ curl -X POST http://127.0.0.1:8000/order-content \
   ]}'
 ```
 
-The`/search`request embeds the query, pulls vectors, and reranks the text. For`where is order A-42`with`kind: fulfillment`you should get`evt-shipped`, not the close receipt event. Gotcha:`/v1/vector/query`expects the computed embedding vector, so the service embeds text first.
+The `/search` request embeds its query, recalls vectors, and reranks their text. The expected result for `where is order A-42` with `kind: fulfillment` is `evt-shipped`, not the nearby receipt event. The one gotcha: `/v1/vector/query` takes the computed embedding vector, so the service embeds the text before querying.
 
 ## Verify the decision
 
-The tight test feeds a receipt and a shipping update, then asserts reranking picks the shipping update for a fulfillment question.
+The focused test supplies a receipt and a shipping update, then checks that reranking selects the shipping update for a fulfillment question.
 
 ```bash
 pytest -q
 ```
 
-Output should end with`1 passed`.
+Expected output ends with `1 passed`.
 
 ## Cut over from the incumbent index
 
-- Stand up the Infrai collection at the embedding dim this service uses.
+- Create the Infrai collection with the embedding dimension used by this service.
 - Export checkout, fulfillment, receipt, and order-update records with stable event IDs.
-- Backfill via`POST /order-content`; check doc counts and sample order IDs.
-- Mirror new events to both indexes until backfill finishes.
-- Replay a fixed support question set; compare chosen event type and order ID.
-- Send a small slice of read traffic to`POST /search`, then raise it after review.
-- Only stop incumbent writes once the new index ate the last mirrored event.
+- Backfill through `POST /order-content`; compare document counts and sample order IDs.
+- Mirror new events to both indexes while the backfill catches up.
+- Replay a fixed set of support questions and compare the selected event type and order ID.
+- Route a small share of read traffic to `POST /search`, then increase it after reviewing results.
+- Stop writes to the incumbent only after the new index has consumed the final mirrored event.
 
-Rollback leaves the old read path and index live during observation. Shift reads back to Pinecone or Weaviate, keep the existing writer fed, and hold onto Infrai event IDs so a later cutover can resume without rebuilding app records.
+Rollback keeps the old read path and index intact during the observation window. Move reads back to Pinecone or Weaviate, continue feeding the existing writer, and retain Infrai event IDs so another cutover can resume without rebuilding application records.
 
 ## Wiring it up for real: Order Content Semantic Search
 
-That's the bare setup. For production use, the notes below are for Order Content Semantic Search.
+That's the minimal version. Before running this for real: The details below apply to Order Content Semantic Search.
 
 **Account & key**
 
